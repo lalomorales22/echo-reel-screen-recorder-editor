@@ -30,7 +30,7 @@ export default function Home() {
 
   const handleRecordingComplete = useCallback((video: { url: string; duration: number }) => {
     setRecordedVideoUrl(video.url);
-    setVideoDuration(video.duration);
+    setVideoDuration(video.duration); // Duration is already sanitized by ScreenCaptureModule
     setCurrentTime(0);
     setIsPlaying(false);
     setCurrentEdl(null); // Reset EDL for new video
@@ -86,7 +86,10 @@ export default function Home() {
 
   const handleLoadedMetadata = useCallback(() => {
     if (videoRef.current) {
-      setVideoDuration(videoRef.current.duration);
+      const rawDuration = videoRef.current.duration;
+      // Sanitize duration to ensure it's a finite, non-negative number
+      const newDuration = (Number.isFinite(rawDuration) && rawDuration >= 0) ? rawDuration : 0;
+      setVideoDuration(newDuration);
     }
   }, []);
 

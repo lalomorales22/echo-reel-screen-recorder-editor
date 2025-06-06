@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { FC } from 'react';
@@ -9,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { ListVideo, Wand2, Voicemail, Type, FileText, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { GenerateEditDecisionListOutput, EditDecisionListInput } from '@/ai/flows/generate-edit-decision-list';
+import type { GenerateEditDecisionListOutput, GenerateEditDecisionListInput as EDLInput } from '@/ai/flows/generate-edit-decision-list'; // Renamed to avoid conflict
 import { generateEditDecisionList } from '@/ai/flows/generate-edit-decision-list';
 import type { GenerateVoiceoverScriptOutput, GenerateVoiceoverScriptInput } from '@/ai/flows/generate-voiceover-script';
 import { generateVoiceoverScript } from '@/ai/flows/generate-voiceover-script';
@@ -19,11 +20,10 @@ import { generateCaptions } from '@/ai/flows/generate-captions';
 interface AiToolsModuleProps {
   videoData: { url: string; duration: number } | null;
   onEdlGenerated: (edl: GenerateEditDecisionListOutput['edl']) => void;
-  onVoiceoverGenerated: (script: string, voiceoverAudio?: string) => void;
+  onVoiceoverGenerated: (script: string, voiceoverAudioUrl?: string) => void;
   onCaptionsGenerated: (captions: string) => void;
 }
 
-// Mock Edit Decision type for internal use
 export interface EditDecision {
   id: string;
   startTime: number;
@@ -46,26 +46,26 @@ const AiToolsModule: FC<AiToolsModuleProps> = ({
   const [isLoadingCaptions, setIsLoadingCaptions] = useState(false);
 
   const handleGenerateEdl = async () => {
-    if (!videoData) {
+    if (!videoData || !videoData.url) {
       toast({ title: "No Video", description: "Please record or upload a video first.", variant: "destructive" });
       return;
     }
     setIsLoadingEdl(true);
     try {
-      // In a real app, convert videoData.url (if it's a local blob/file) to a data URI.
-      // For now, we'll mock this part as AI flows expect data URIs.
-      const mockScreenRecordingDataUri = 'data:video/webm;base64,mocked_video_data_uri'; // Placeholder
-      const input: EditDecisionListInput = { screenRecordingDataUri: mockScreenRecordingDataUri };
+      // In a real app, you might need to fetch the blob and convert to data URI if Genkit doesn't handle blob URLs
+      // For now, assuming Genkit flows can handle blob URLs or this is handled internally.
+      // If Genkit strictly needs data URIs, this part would need blob-to-dataURI conversion.
+      const input: EDLInput = { screenRecordingDataUri: videoData.url }; // Pass the actual video URL
       
       // const result = await generateEditDecisionList(input);
-      // For UI dev, mock the result:
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate API call
+      // Mocking result for UI dev:
+      await new Promise(resolve => setTimeout(resolve, 1500)); 
       const mockResult: GenerateEditDecisionListOutput = {
         edl: [
-          { startTime: 5, endTime: 10, action: "cut", details: "Removed dead space" },
-          { startTime: 15, endTime: 18, action: "zoom", details: "Zoomed on element X" },
-          { startTime: 22, endTime: 24, action: "highlight", details: "Highlighted button Y" },
-        ]
+          { startTime: videoData.duration * 0.1, endTime: videoData.duration * 0.2, action: "cut", details: "Removed dead space" },
+          { startTime: videoData.duration * 0.3, endTime: videoData.duration * 0.4, action: "zoom", details: "Zoomed on element X" },
+          { startTime: videoData.duration * 0.5, endTime: videoData.duration * 0.6, action: "highlight", details: "Highlighted button Y" },
+        ].filter(edit => edit.endTime <= videoData.duration) // Ensure mock edits are within video duration
       };
       onEdlGenerated(mockResult.edl);
       toast({ title: "AI Edits Generated", description: "Review suggestions on the timeline." });
@@ -84,13 +84,13 @@ const AiToolsModule: FC<AiToolsModuleProps> = ({
     }
     setIsLoadingVoiceoverScript(true);
     try {
-      const input: GenerateVoiceoverScriptInput = { videoContentDescription: "A screen recording showing a user interacting with a web application, clicking buttons and typing text." }; // Mock description
+      const input: GenerateVoiceoverScriptInput = { videoContentDescription: "A screen recording of a user interacting with a web application. Key actions include clicking buttons, typing text into forms, and navigating through different pages." }; 
       // const result = await generateVoiceoverScript(input);
-      // For UI dev, mock the result:
       await new Promise(resolve => setTimeout(resolve, 1500));
-      const mockResult: GenerateVoiceoverScriptOutput = { voiceoverScript: "First, click on the login button. Then, enter your credentials. Finally, navigate to the dashboard."};
+      const mockResult: GenerateVoiceoverScriptOutput = { voiceoverScript: "User starts by landing on the homepage. First, they click on the login button located at the top right. Then, they proceed to enter their username and password into the respective fields. After successful login, they navigate to the main dashboard to view their account summary."};
       setVoiceoverScript(mockResult.voiceoverScript);
-      toast({ title: "Voiceover Script Generated", description: "You can now generate audio." });
+      onVoiceoverGenerated(mockResult.voiceoverScript); // Pass script to parent
+      toast({ title: "Voiceover Script Generated", description: "You can now (optionally) generate audio." });
     } catch (error) {
       console.error("Error generating voiceover script:", error);
       toast({ title: "Error", description: "Could not generate voiceover script.", variant: "destructive" });
@@ -106,11 +106,11 @@ const AiToolsModule: FC<AiToolsModuleProps> = ({
     }
     setIsLoadingVoiceoverAudio(true);
     try {
-      // Mock TTS generation
+      // This would be a call to a Text-to-Speech AI flow
       await new Promise(resolve => setTimeout(resolve, 2000));
-      const mockAudioUrl = "mock_voiceover_audio.mp3"; // Placeholder
-      onVoiceoverGenerated(voiceoverScript, mockAudioUrl);
-      toast({ title: "Voiceover Audio Generated", description: "Added to timeline." });
+      const mockAudioUrl = "data:audio/mp3;base64,SUQzBAAAAAAB..."; // Placeholder Data URI for mock audio
+      onVoiceoverGenerated(voiceoverScript, mockAudioUrl); // Update parent with audio URL
+      toast({ title: "Voiceover Audio Generated", description: "Voiceover audio (mock) is ready." });
     } catch (error) {
       toast({ title: "Error", description: "Could not generate voiceover audio.", variant: "destructive" });
     } finally {
@@ -119,20 +119,39 @@ const AiToolsModule: FC<AiToolsModuleProps> = ({
   };
   
   const handleGenerateCaptions = async () => {
-    if (!videoData) {
+    if (!videoData || !videoData.url) {
       toast({ title: "No Video", description: "Please record or upload a video first.", variant: "destructive" });
       return;
     }
     setIsLoadingCaptions(true);
     try {
-      // Similar to EDL, mock data URI for audio.
-      const mockAudioDataUri = 'data:audio/webm;base64,mocked_audio_data_uri'; // Placeholder
-      const input: GenerateCaptionsInput = { audioDataUri: mockAudioDataUri };
+      // Assuming Genkit flow can handle blob URL directly or it's converted.
+      // For audio extraction from video, a more complex setup or a specific Genkit tool would be needed.
+      // Here, we'll assume `videoData.url` can be used or a separate audio track is available.
+      // For this example, we use a mock based on videoData.url.
+      const input: GenerateCaptionsInput = { audioDataUri: videoData.url }; // This implies the flow can extract audio or it's an audio file.
+      
       // const result = await generateCaptions(input);
-      // For UI dev, mock the result:
       await new Promise(resolve => setTimeout(resolve, 2000));
+      const d = videoData.duration;
+      const mockCaptionsSRT = `1
+00:00:${String(Math.floor(d * 0.1)).padStart(2, '0')},000 --> 00:00:${String(Math.floor(d * 0.2)).padStart(2, '0')},000
+This is the first mock caption.
+
+2
+00:00:${String(Math.floor(d * 0.25)).padStart(2, '0')},000 --> 00:00:${String(Math.floor(d * 0.35)).padStart(2, '0')},000
+And here comes a second one.
+
+3
+00:00:${String(Math.floor(d * 0.4)).padStart(2, '0')},000 --> 00:00:${String(Math.floor(d * 0.5)).padStart(2, '0')},000
+Talking about what's happening on screen.
+
+4
+00:00:${String(Math.floor(d * 0.6)).padStart(2, '0')},000 --> 00:00:${String(Math.floor(d * 0.7)).padStart(2, '0')},000
+Almost near the end of this segment.
+`;
       const mockResult: GenerateCaptionsOutput = {
-        captions: "1\n00:00:01,000 --> 00:00:03,000\nThis is the first caption.\n\n2\n00:00:04,000 --> 00:00:06,000\nThis is the second caption.\n"
+        captions: d > 0 ? mockCaptionsSRT : "1\n00:00:01,000 --> 00:00:03,000\nNo video duration for dynamic captions.\n"
       };
       onCaptionsGenerated(mockResult.captions);
       toast({ title: "Captions Generated", description: "Added to timeline." });
@@ -163,7 +182,7 @@ const AiToolsModule: FC<AiToolsModuleProps> = ({
             </AccordionTrigger>
             <AccordionContent className="space-y-3 pt-2">
               <Textarea
-                placeholder="Enter your voiceover script here..."
+                placeholder="Enter your voiceover script here, or generate one from the video content."
                 value={voiceoverScript}
                 onChange={(e) => setVoiceoverScript(e.target.value)}
                 className="bg-input border-sidebar-border focus:ring-ring text-sidebar-foreground"
@@ -173,7 +192,7 @@ const AiToolsModule: FC<AiToolsModuleProps> = ({
                 {isLoadingVoiceoverScript ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileText className="mr-2 h-4 w-4 text-secondary" />}
                 Generate Script from Video
               </Button>
-              <Select defaultValue="alloy">
+              <Select defaultValue="alloy" disabled={!voiceoverScript}>
                 <SelectTrigger className="w-full bg-input border-sidebar-border text-sidebar-foreground">
                   <SelectValue placeholder="Select AI Voice" />
                 </SelectTrigger>
@@ -188,7 +207,7 @@ const AiToolsModule: FC<AiToolsModuleProps> = ({
               </Select>
               <Button onClick={handleGenerateVoiceoverAudio} className="w-full" variant="secondary" disabled={!voiceoverScript || isLoadingVoiceoverAudio}>
                  {isLoadingVoiceoverAudio ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
-                Generate Voiceover Audio
+                Generate Voiceover Audio (Mock)
               </Button>
             </AccordionContent>
           </AccordionItem>
@@ -211,4 +230,3 @@ const AiToolsModule: FC<AiToolsModuleProps> = ({
 };
 
 export default AiToolsModule;
-

@@ -1,4 +1,3 @@
-
 "use client";
 
 import type { FC } from 'react';
@@ -12,21 +11,29 @@ import { useToast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface ScreenCaptureModuleProps {
-  onRecordingComplete: (videoData: { url: string; duration: number }) => void;
+  onRecordingComplete: (videoData: { 
+    screenRecording?: { url: string; duration: number };
+    webcamRecording?: { url: string; duration: number };
+  }) => void;
 }
 
 const ScreenCaptureModule: FC<ScreenCaptureModuleProps> = ({ onRecordingComplete }) => {
   const [isRecording, setIsRecording] = useState(false);
   const [useWebcam, setUseWebcam] = useState(false);
+  const [recordWebcam, setRecordWebcam] = useState(false);
   const [useMicrophone, setUseMicrophone] = useState(true);
   const [hasCameraPermission, setHasCameraPermission] = useState(false);
   const { toast } = useToast();
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const webcamRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
+  const webcamChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+  const webcamStreamRef = useRef<MediaStream | null>(null);
   const webcamVideoRef = useRef<HTMLVideoElement>(null);
   const previousVideoUrlRef = useRef<string | null>(null);
+  const previousWebcamUrlRef = useRef<string | null>(null);
 
 
   useEffect(() => {
@@ -73,32 +80,48 @@ const ScreenCaptureModule: FC<ScreenCaptureModuleProps> = ({ onRecordingComplete
 
   const handleToggleRecording = async () => {
     if (isRecording) {
+      // Stop both recordings
       if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
         mediaRecorderRef.current.stop();
       }
-      // setIsRecording(false) will be called in onstop
+      if (webcamRecorderRef.current && webcamRecorderRef.current.state === "recording") {
+        webcamRecorderRef.current.stop();
+      }
     } else {
-      setIsRecording(true); // Set loading state immediately
+      setIsRecording(true);
       recordedChunksRef.current = [];
+      webcamChunksRef.current = [];
 
-      // Revoke previous blob URL if it exists
+      // Revoke previous blob URLs if they exist
       if (previousVideoUrlRef.current) {
         URL.revokeObjectURL(previousVideoUrlRef.current);
         previousVideoUrlRef.current = null;
       }
+      if (previousWebcamUrlRef.current) {
+        URL.revokeObjectURL(previousWebcamUrlRef.current);
+        previousWebcamUrlRef.current = null;
+      }
 
       try {
+        // Start screen recording
         const videoStream = await navigator.mediaDevices.getDisplayMedia({
-          video: { cursor: "always" as const }, // Explicitly type 'always'
+          video: { 
+            cursor: "always" as const
+          } as MediaTrackConstraints & { cursor?: string },
         });
 
         videoStream.getVideoTracks()[0].onended = () => {
           if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
             mediaRecorderRef.current.stop();
           }
+          if (webcamRecorderRef.current && webcamRecorderRef.current.state === "recording") {
+            webcamRecorderRef.current.stop();
+          }
           setIsRecording(false);
           streamRef.current?.getTracks().forEach(track => track.stop());
+          webcamStreamRef.current?.getTracks().forEach(track => track.stop());
           streamRef.current = null;
+          webcamStreamRef.current = null;
         };
         
         let combinedStreamTracks = [...videoStream.getVideoTracks()];
@@ -120,13 +143,74 @@ const ScreenCaptureModule: FC<ScreenCaptureModuleProps> = ({ onRecordingComplete
         const finalStream = new MediaStream(combinedStreamTracks);
         streamRef.current = finalStream;
 
+        // Start webcam recording if enabled
+        if (recordWebcam && useWebcam) {
+          try {
+            const webcamStream = await navigator.mediaDevices.getUserMedia({ 
+              video: true,
+              audio: false // Audio is already captured from microphone
+            });
+            webcamStreamRef.current = webcamStream;
+
+            // Set up webcam recorder
+            let webcamOptions = { mimeType: 'video/webm;codecs=vp9' };
+            if (!MediaRecorder.isTypeSupported(webcamOptions.mimeType)) {
+              webcamOptions.mimeType = 'video/webm';
+              if (!MediaRecorder.isTypeSupported(webcamOptions.mimeType)) {
+                webcamOptions = {} as any;
+              }
+            }
+
+            webcamRecorderRef.current = new MediaRecorder(webcamStream, webcamOptions);
+
+            webcamRecorderRef.current.ondataavailable = (event) => {
+              if (event.data.size > 0) {
+                webcamChunksRef.current.push(event.data);
+              }
+            };
+
+            webcamRecorderRef.current.onstop = () => {
+              const mimeType = webcamOptions.mimeType || 'video/webm';
+              const blob = new Blob(webcamChunksRef.current, { type: mimeType });
+              const webcamUrl = URL.createObjectURL(blob);
+              previousWebcamUrlRef.current = webcamUrl;
+              
+              const tempVideoEl = document.createElement('video');
+              tempVideoEl.onloadedmetadata = () => {
+                const rawDuration = tempVideoEl.duration;
+                const videoDuration = (Number.isFinite(rawDuration) && rawDuration > 0) ? rawDuration : 0;
+                
+                // Check if screen recording is also complete
+                if (!mediaRecorderRef.current || mediaRecorderRef.current.state === 'inactive') {
+                  onRecordingComplete({ 
+                    screenRecording: previousVideoUrlRef.current ? 
+                      { url: previousVideoUrlRef.current, duration: videoDuration } : undefined,
+                    webcamRecording: { url: webcamUrl, duration: videoDuration }
+                  });
+                }
+              };
+              tempVideoEl.src = webcamUrl;
+            };
+
+            webcamRecorderRef.current.start();
+          } catch (webcamError) {
+            console.error("Webcam recording error:", webcamError);
+            toast({
+              title: "Webcam Recording Failed",
+              description: "Could not access webcam for recording.",
+              variant: "destructive",
+            });
+          }
+        }
+
+        // Set up screen recorder
         let options = { mimeType: 'video/webm;codecs=vp9' };
         if (!MediaRecorder.isTypeSupported(options.mimeType)) {
           console.warn(`${options.mimeType} is not supported. Trying 'video/webm'.`);
           options.mimeType = 'video/webm';
           if (!MediaRecorder.isTypeSupported(options.mimeType)) {
             console.warn(`${options.mimeType} is not supported. Using browser default.`);
-            options = {} as any; // Let browser decide
+            options = {} as any;
           }
         }
 
@@ -139,22 +223,38 @@ const ScreenCaptureModule: FC<ScreenCaptureModuleProps> = ({ onRecordingComplete
         };
 
         mediaRecorderRef.current.onstop = () => {
-          const mimeType = options.mimeType || 'video/webm'; // Default if browser picked
+          const mimeType = options.mimeType || 'video/webm';
           const blob = new Blob(recordedChunksRef.current, { type: mimeType });
           const videoUrl = URL.createObjectURL(blob);
-          previousVideoUrlRef.current = videoUrl; // Store for future revocation
+          previousVideoUrlRef.current = videoUrl;
           
           const tempVideoEl = document.createElement('video');
           tempVideoEl.onloadedmetadata = () => {
             const rawDuration = tempVideoEl.duration;
-            // Ensure duration is a valid, finite, positive number; otherwise, default to 0.
             const videoDuration = (Number.isFinite(rawDuration) && rawDuration > 0) ? rawDuration : 0;
-            onRecordingComplete({ url: videoUrl, duration: videoDuration });
+            
+            // Prepare recording data
+            const recordingData: { 
+              screenRecording?: { url: string; duration: number };
+              webcamRecording?: { url: string; duration: number };
+            } = {
+              screenRecording: { url: videoUrl, duration: videoDuration }
+            };
+
+            // Add webcam data if it was recorded
+            if (previousWebcamUrlRef.current) {
+              recordingData.webcamRecording = { 
+                url: previousWebcamUrlRef.current, 
+                duration: videoDuration 
+              };
+            }
+
+            onRecordingComplete(recordingData);
           };
+          
           tempVideoEl.onerror = (e) => {
              console.error("Error loading video metadata for duration:", e);
-             // Ensure we still call onRecordingComplete, even with an error, to update state.
-             onRecordingComplete({ url: videoUrl, duration: 0 });
+             onRecordingComplete({ screenRecording: { url: videoUrl, duration: 0 } });
           }
           tempVideoEl.src = videoUrl;
 
@@ -162,18 +262,21 @@ const ScreenCaptureModule: FC<ScreenCaptureModuleProps> = ({ onRecordingComplete
           toast({ title: "Recording Stopped", description: "Video processing complete." });
           
           streamRef.current?.getTracks().forEach(track => track.stop());
+          webcamStreamRef.current?.getTracks().forEach(track => track.stop());
           streamRef.current = null;
+          webcamStreamRef.current = null;
           recordedChunksRef.current = [];
+          webcamChunksRef.current = [];
         };
 
         mediaRecorderRef.current.start();
-        toast({ title: "Recording Started", description: "Capturing your screen..." });
+        toast({ title: "Recording Started", description: recordWebcam && useWebcam ? "Capturing screen and webcam..." : "Capturing your screen..." });
 
       } catch (error: any) {
         console.error("Error starting recording:", error);
         let description = `Could not start recording: ${error.message || 'Permission denied or no screen selected.'}`;
         if (error.message && (error.message.includes("disallowed by permissions policy") || error.message.includes("display-capture"))) {
-          description = "Screen recording is disallowed by the current browser or environment's permissions policy. If running in an embedded window (like an IDE or platform preview), the embedding environment may need to explicitly allow 'display-capture'. Please check your browser settings or the environment's documentation.";
+          description = "Screen recording is disallowed by the current browser or environment's permissions policy.";
         } else if (error.name === 'NotAllowedError' || error.message?.includes('Permission denied')) {
             description = "Screen recording permission was denied. Please allow access to your screen to start recording.";
         }
@@ -185,7 +288,9 @@ const ScreenCaptureModule: FC<ScreenCaptureModuleProps> = ({ onRecordingComplete
         });
         setIsRecording(false);
         streamRef.current?.getTracks().forEach(track => track.stop());
+        webcamStreamRef.current?.getTracks().forEach(track => track.stop());
         streamRef.current = null;
+        webcamStreamRef.current = null;
       }
     }
   };
@@ -209,17 +314,32 @@ const ScreenCaptureModule: FC<ScreenCaptureModuleProps> = ({ onRecordingComplete
         </div>
 
         {useWebcam && (
-          <div className="space-y-2">
-            <video ref={webcamVideoRef} className="w-full aspect-video rounded-md bg-black border border-sidebar-border" autoPlay muted playsInline />
-            {!hasCameraPermission && (
-              <Alert variant="destructive">
-                <AlertTitle>Camera Access Denied</AlertTitle>
-                <AlertDescription>
-                  Enable camera permissions for webcam preview.
-                </AlertDescription>
-              </Alert>
-            )}
-          </div>
+          <>
+            <div className="space-y-2">
+              <video ref={webcamVideoRef} className="w-full aspect-video rounded-md bg-black border border-sidebar-border" autoPlay muted playsInline />
+              {!hasCameraPermission && (
+                <Alert variant="destructive">
+                  <AlertTitle>Camera Access Denied</AlertTitle>
+                  <AlertDescription>
+                    Enable camera permissions for webcam preview.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <Label htmlFor="record-webcam-switch" className="flex items-center text-sidebar-foreground/80">
+                <Camera className="mr-2 h-4 w-4 text-secondary" />
+                Record Webcam
+              </Label>
+              <Switch 
+                id="record-webcam-switch" 
+                checked={recordWebcam} 
+                onCheckedChange={setRecordWebcam}
+                disabled={isRecording || !hasCameraPermission}
+              />
+            </div>
+          </>
         )}
 
         <div className="flex items-center justify-between">

@@ -6,12 +6,16 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Download } from 'lucide-react';
 import ExportModal from '@/components/export/ExportModal';
+import type { EditDecision } from './AiToolsModule';
 
 interface ExportModuleProps {
   videoData: { url: string; duration: number } | null; // This would be the final, edited video data
+  edl: EditDecision[] | null;
+  userVoiceover: { url: string; duration: number } | null;
+  captionsData: string | null;
 }
 
-const ExportModule: FC<ExportModuleProps> = ({ videoData }) => {
+const ExportModule: FC<ExportModuleProps> = ({ videoData, edl, userVoiceover, captionsData }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   return (
@@ -30,7 +34,14 @@ const ExportModule: FC<ExportModuleProps> = ({ videoData }) => {
           </Button>
         </CardContent>
       </Card>
-      <ExportModal isOpen={isModalOpen} onOpenChange={setIsModalOpen} />
+      <ExportModal 
+        isOpen={isModalOpen} 
+        onOpenChange={setIsModalOpen}
+        videoData={videoData}
+        edl={edl}
+        userVoiceover={userVoiceover}
+        captionsData={captionsData}
+      />
     </>
   );
 };

@@ -1,4 +1,3 @@
-
 import type { FC, RefObject } from 'react';
 import Image from 'next/image';
 import { Card, CardContent } from '@/components/ui/card';
@@ -7,20 +6,26 @@ import { PlayCircle } from 'lucide-react';
 interface VideoPreviewProps {
   videoSrc?: string | null;
   videoRef: RefObject<HTMLVideoElement>;
+  voiceoverSrc?: string | null;
+  audioRef?: RefObject<HTMLAudioElement>;
   onTimeUpdate: () => void;
   onLoadedMetadata: () => void;
   onPlay: () => void;
   onPause: () => void;
+  subtitlesSrc?: string | null;
   className?: string;
 }
 
 const VideoPreview: FC<VideoPreviewProps> = ({ 
   videoSrc, 
   videoRef,
+  voiceoverSrc,
+  audioRef,
   onTimeUpdate,
   onLoadedMetadata,
   onPlay,
   onPause,
+  subtitlesSrc,
   className 
 }) => {
   const isActualVideo = videoSrc && (videoSrc.startsWith('blob:') || videoSrc.startsWith('data:video'));
@@ -32,17 +37,38 @@ const VideoPreview: FC<VideoPreviewProps> = ({
     <Card className={`bg-card border-border shadow-xl overflow-hidden ${className}`}>
       <CardContent className="p-0 aspect-video relative flex items-center justify-center bg-black">
         {videoSrc && isActualVideo ? (
-          <video
-            ref={videoRef}
-            src={videoSrc}
-            controls
-            onTimeUpdate={onTimeUpdate}
-            onLoadedMetadata={onLoadedMetadata}
-            onPlay={onPlay}
-            onPause={onPause}
-            className="w-full h-full object-contain"
-            data-ai-hint="screen recording"
-          />
+          <>
+            <video
+              ref={videoRef}
+              src={videoSrc}
+              controls
+              onTimeUpdate={onTimeUpdate}
+              onLoadedMetadata={onLoadedMetadata}
+              onPlay={onPlay}
+              onPause={onPause}
+              className="w-full h-full object-contain"
+              data-ai-hint="screen recording"
+              crossOrigin="anonymous"
+            >
+              {subtitlesSrc && (
+                <track
+                  src={subtitlesSrc}
+                  kind="subtitles"
+                  srcLang="en"
+                  label="English"
+                  default
+                />
+              )}
+            </video>
+            {voiceoverSrc && (
+              <audio
+                ref={audioRef}
+                src={voiceoverSrc}
+                onLoadedMetadata={onLoadedMetadata}
+                onTimeUpdate={onTimeUpdate}
+              />
+            )}
+          </>
         ) : (
           <>
             <Image 

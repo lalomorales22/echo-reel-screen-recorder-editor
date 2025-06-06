@@ -167,9 +167,13 @@ const ScreenCaptureModule: FC<ScreenCaptureModuleProps> = ({ onRecordingComplete
 
       } catch (error: any) {
         console.error("Error starting recording:", error);
+        let description = `Could not start recording: ${error.message || 'Permission denied or no screen selected.'}`;
+        if (error.message && (error.message.includes("disallowed by permissions policy") || error.message.includes("display-capture"))) {
+          description = "Screen recording is disallowed by the current browser or environment's permissions policy. If running in an embedded window (like an IDE or platform preview), the embedding environment may need to explicitly allow 'display-capture'. Please check your browser settings or the environment's documentation.";
+        }
         toast({
           title: "Recording Error",
-          description: `Could not start recording: ${error.message || 'Permission denied or no screen selected.'}`,
+          description: description,
           variant: "destructive",
         });
         setIsRecording(false);
@@ -239,5 +243,3 @@ const ScreenCaptureModule: FC<ScreenCaptureModuleProps> = ({ onRecordingComplete
 };
 
 export default ScreenCaptureModule;
-
-    

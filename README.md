@@ -1,4 +1,5 @@
 # EchoReel: AI-Powered Screen Recording & Editing
+![Screenshot 2025-06-06 at 1 05 31 PM](https://github.com/user-attachments/assets/0a60c9d8-fb17-4a40-9377-09f3d73c1c0f)
 
 EchoReel is a web application designed to simplify screen recording and enhance video editing with the power of Artificial Intelligence. Users can easily capture their screen, generate edit decision lists (EDLs) automatically, create voiceover scripts from video content, and generate time-synced captions.
 

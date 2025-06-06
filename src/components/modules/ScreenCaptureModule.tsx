@@ -146,10 +146,14 @@ const ScreenCaptureModule: FC<ScreenCaptureModuleProps> = ({ onRecordingComplete
           
           const tempVideoEl = document.createElement('video');
           tempVideoEl.onloadedmetadata = () => {
-            onRecordingComplete({ url: videoUrl, duration: tempVideoEl.duration });
+            const rawDuration = tempVideoEl.duration;
+            // Ensure duration is a valid, finite, positive number; otherwise, default to 0.
+            const videoDuration = (Number.isFinite(rawDuration) && rawDuration > 0) ? rawDuration : 0;
+            onRecordingComplete({ url: videoUrl, duration: videoDuration });
           };
-          tempVideoEl.onerror = () => {
-             console.error("Error loading video metadata for duration.");
+          tempVideoEl.onerror = (e) => {
+             console.error("Error loading video metadata for duration:", e);
+             // Ensure we still call onRecordingComplete, even with an error, to update state.
              onRecordingComplete({ url: videoUrl, duration: 0 });
           }
           tempVideoEl.src = videoUrl;
@@ -170,7 +174,10 @@ const ScreenCaptureModule: FC<ScreenCaptureModuleProps> = ({ onRecordingComplete
         let description = `Could not start recording: ${error.message || 'Permission denied or no screen selected.'}`;
         if (error.message && (error.message.includes("disallowed by permissions policy") || error.message.includes("display-capture"))) {
           description = "Screen recording is disallowed by the current browser or environment's permissions policy. If running in an embedded window (like an IDE or platform preview), the embedding environment may need to explicitly allow 'display-capture'. Please check your browser settings or the environment's documentation.";
+        } else if (error.name === 'NotAllowedError' || error.message?.includes('Permission denied')) {
+            description = "Screen recording permission was denied. Please allow access to your screen to start recording.";
         }
+        
         toast({
           title: "Recording Error",
           description: description,
@@ -243,3 +250,4 @@ const ScreenCaptureModule: FC<ScreenCaptureModuleProps> = ({ onRecordingComplete
 };
 
 export default ScreenCaptureModule;
+

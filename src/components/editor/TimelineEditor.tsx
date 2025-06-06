@@ -113,10 +113,10 @@ const TimelineEditor: FC<TimelineEditorProps> = ({
     return allCaptions;
   }, [captionTracks]);
 
-  // Combine legacy and new captions
+  // Combine only new caption tracks (exclude legacy to prevent duplication)
   const allCaptions = useMemo(() => {
-    return [...parsedLegacyCaptions, ...allCaptionsFromTracks];
-  }, [parsedLegacyCaptions, allCaptionsFromTracks]);
+    return [...allCaptionsFromTracks];
+  }, [allCaptionsFromTracks]);
 
   return (
     <Card className={`bg-card border-border shadow-xl flex flex-col ${className}`}>
@@ -241,15 +241,15 @@ const TimelineEditor: FC<TimelineEditorProps> = ({
                 {track.captions.map(caption => (
                   <div
                     key={caption.id}
-                    className="absolute h-full bg-secondary/60 hover:bg-secondary/80 cursor-pointer overflow-hidden group border-l border-r border-secondary/80"
+                    className="absolute h-full bg-secondary/70 hover:bg-secondary/90 cursor-pointer overflow-hidden group border border-secondary transition-colors duration-150"
                     style={{
                       left: `${(caption.startTime / videoDuration) * 100}%`,
-                      width: `${Math.max(((caption.endTime - caption.startTime) / videoDuration) * 100, 0.5)}%`,
-                      minWidth: '2px'
+                      width: `${Math.max(((caption.endTime - caption.startTime) / videoDuration) * 100, 1.5)}%`,
+                      minWidth: '6px'
                     }}
                     title={`${caption.text} (${caption.startTime.toFixed(1)}s - ${caption.endTime.toFixed(1)}s)`}
                   >
-                    <span className="absolute top-0 left-0 right-0 bottom-0 p-1 text-[10px] leading-tight text-secondary-foreground whitespace-normal overflow-hidden text-ellipsis">
+                    <span className="absolute inset-0.5 text-[9px] leading-tight text-secondary-foreground font-medium whitespace-normal overflow-hidden text-ellipsis flex items-start">
                       {caption.text}
                     </span>
                   </div>
@@ -257,8 +257,8 @@ const TimelineEditor: FC<TimelineEditorProps> = ({
               </TimelineTrack>
             ))}
 
-            {/* Legacy Captions Track - for backward compatibility */}
-            {captionsData && parsedLegacyCaptions.length > 0 && (
+            {/* Legacy Captions Track - only show if no modern caption tracks exist */}
+            {captionsData && parsedLegacyCaptions.length > 0 && captionTracks.length === 0 && (
               <TimelineTrack title="Legacy Captions" icon={<CaptionsIcon className="text-secondary" />} duration={videoDuration} zoomLevel={zoomLevel} trackWidth={trackWidth}>
                 {videoDuration > 0 && (
                   <div className="absolute top-0 left-0 h-full bg-secondary/20" style={{width: '100%'}}>

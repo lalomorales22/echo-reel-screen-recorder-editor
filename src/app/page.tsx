@@ -50,6 +50,10 @@ export default function Home() {
     }
     if (videoData.webcamRecording) {
       setWebcamVideoUrl(videoData.webcamRecording.url);
+      // Set duration from webcam if no screen recording is available
+      if (!videoData.screenRecording) {
+        setVideoDuration(videoData.webcamRecording.duration);
+      }
     }
     
     setCurrentTime(0);
@@ -277,7 +281,10 @@ export default function Home() {
               <ScreenCaptureModule onRecordingComplete={handleRecordingComplete} />
               <Separator className="my-6 bg-sidebar-border" />
               <AiToolsModule
-                videoData={recordedVideoUrl ? { url: recordedVideoUrl, duration: videoDuration } : null}
+                videoData={(recordedVideoUrl || webcamVideoUrl) && videoDuration > 0 ? { 
+                  url: (recordedVideoUrl || webcamVideoUrl)!, 
+                  duration: videoDuration 
+                } : null}
                 onEdlGenerated={handleEdlGenerated}
                 onVoiceoverGenerated={handleVoiceoverGenerated}
                 onCaptionsGenerated={handleCaptionsGenerated}
@@ -285,7 +292,10 @@ export default function Home() {
               />
               <Separator className="my-6 bg-sidebar-border" />
               <ExportModule 
-                videoData={recordedVideoUrl ? { url: recordedVideoUrl, duration: videoDuration } : null}
+                videoData={(recordedVideoUrl || webcamVideoUrl) && videoDuration > 0 ? { 
+                  url: (recordedVideoUrl || webcamVideoUrl)!, 
+                  duration: videoDuration 
+                } : null}
                 edl={currentEdl}
                 userVoiceover={userVoiceover}
                 captionsData={captionsData}
